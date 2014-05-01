@@ -1,7 +1,7 @@
 Counting Functional Pregroup Types
 ===
 
-Short version:
+_Short version_:
 
 We consider words on the set `Z` of relative integers.
 
@@ -27,4 +27,6 @@ Find the number `X(n)` of words of length `n`.
 *Conjecture*: `X(n) = sum(i = 0 .. n, C(2 * n - i, n + i))`.
 
 `C(n, k)` is the binomial coefficient.
+
+http://oeis.org/A108081
 
