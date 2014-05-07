@@ -10,52 +10,63 @@ import Data.List
   ( foldl'
   )
 
-type Map k v = [(k, v)]
+import Data.Trie
+  ( Trie
+  , empty
+  , singleton
+  , fromList
+  , toList
+  , mergeBy
+  )
 
-fpts :: Int -> Map [Int] [FT]
+import qualified Data.ByteString as B
+  ( pack
+  , map
+  , append
+  )
+
+type Map = Trie [FT]
+
+fpts :: Int -> Map
 fpts = (fptsMem !!) . (subtract 1)
 
-fptsMem :: [Map [Int] [FT]]
+fptsMem :: [Map]
 fptsMem = [ fpts' n | n <- [1 ..] ]
 
-fptsMemRev :: [Map [Int] [FT]]
+fptsMemRev :: [Map]
 fptsMemRev = [ fptsRev' n | n <- [1 ..] ] -- @fptsMemRev@ uses reversed keys
 
-fpts' :: Int -> Map [Int] [FT]
-fpts' 1 = [([0],[A])]
+fpts' :: Int -> Map
+fpts' 1 = singleton (B.pack [0]) [A]
 fpts' n = mergeList over `merge` mergeList under
   where
-    prev  = take (n - 1) fptsMem
-    prev' = reverse $ take (n - 1) fptsMemRev
-    over  = zipWith (crossMap (\k k' -> k ++ map (subtract 1) k') (:/))
+    prev  = map toList $ take (n - 1) fptsMem
+    prev' = map toList $ reverse $ take (n - 1) fptsMemRev
+    over  = map fromList
+          $ zipWith (crossMap (\k k' -> k `B.append` B.map (subtract 1) k') (:/))
                     prev prev'
-    under = zipWith (crossMap (\k k' -> map (+ 1) k ++ k') (:\))
+    under = map fromList
+          $ zipWith (crossMap (\k k' -> B.map (+ 1) k `B.append` k') (:\))
                     prev' prev
 
-fptsRev' :: Int -> Map [Int] [FT]
-fptsRev' 1 = [([0],[A])]
+fptsRev' :: Int -> Map
+fptsRev' 1 = singleton (B.pack [0]) [A]
 fptsRev' n = mergeList over `merge` mergeList under
   where
-    prev  = reverse $ take (n - 1) fptsMem
-    prev' = take (n - 1) fptsMemRev
-    over = zipWith (crossMap (\k k' -> map (subtract 1) k ++ k') (flip (:/)))
+    prev  = map toList $ reverse $ take (n - 1) fptsMem
+    prev' = map toList $ take (n - 1) fptsMemRev
+    over  = map fromList
+          $ zipWith (crossMap (\k k' -> B.map (subtract 1) k `B.append` k') (flip (:/)))
                    prev prev'
-    under = zipWith (crossMap (\k k' -> k ++ map (+ 1) k') (flip (:/)))
+    under = map fromList
+          $ zipWith (crossMap (\k k' -> k `B.append` B.map (+ 1) k') (flip (:/)))
                     prev' prev
 
-mergeList :: [Map [Int] [FT]] -> Map [Int] [FT]
-mergeList = foldl' merge []
+mergeList :: [Map] -> Map
+mergeList = foldl' merge empty
 
-merge :: Map [Int] [FT] -> Map [Int] [FT] -> Map [Int] [FT]
-merge [] ys = ys
-merge xs [] = xs
-merge xs'@((k, v) : xs) ys'@((h, u) : ys)
-  |    k == h = (k, u ++ v) : merge xs  ys
-  |    k < h  = (k, v)      : merge xs  ys'
-  | otherwise = (h, u)      : merge xs' ys
-
-twice :: a -> (a, a)
-twice x = (x, x)
+merge :: Map -> Map -> Map
+merge = (mergeBy $ (Just .) . (++))
 
 crossMap :: (k -> k -> h) -> (v -> v -> u)
          -> [(k, [v])] -> [(k, [v])] -> [(h, [u])]
